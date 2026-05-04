@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+chroma_db/
+rag_metadata.db
+*.db
+.DS_Store
