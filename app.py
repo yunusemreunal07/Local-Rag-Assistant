@@ -148,19 +148,31 @@ if user_input:
         pass
 
     # RAG pipeline
+    recent_history = st.session_state.messages[-6:] if st.session_state.messages else []
+
     with st.chat_message("assistant"):
         with st.spinner("Thinking…"):
             # 1. Classify query
             query_type = classify_query(user_input)
 
+            # Build enriched retrieval query using recent history context
+            retrieval_query = user_input
+            if recent_history:
+                last_user = next(
+                    (m["content"] for m in reversed(recent_history) if m["role"] == "user"),
+                    None,
+                )
+                if last_user and last_user != user_input:
+                    retrieval_query = f"{last_user} {user_input}"
+
             # 2. Retrieve relevant chunks
             try:
-                chunks = retrieve(user_input, query_type=query_type, top_k=TOP_K)
+                chunks = retrieve(retrieval_query, query_type=query_type, top_k=TOP_K)
             except Exception as exc:
                 chunks = []
                 st.error(f"Retrieval error: {exc}")
 
-            # 3. Generate answer
+            # 3. Generate answer with conversation history
             if not ollama_is_available()[0]:
                 answer = (
                     "Ollama is not running. "
@@ -168,7 +180,7 @@ if user_input:
                     f"`{LLM_MODEL}` is pulled."
                 )
             else:
-                answer = generate_answer(user_input, chunks)
+                answer = generate_answer(user_input, chunks, history=recent_history)
 
         # Display answer
         st.markdown(answer)

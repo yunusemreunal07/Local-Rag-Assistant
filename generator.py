@@ -23,16 +23,11 @@ SYSTEM_PROMPT = (
 )
 
 
-def _build_prompt(query: str, context_chunks: list[dict]) -> str:
-    """
-    Build the full prompt string from retrieved context chunks and the user query.
-
-    Parameters
-    ----------
-    query          : user's question
-    context_chunks : list of dicts returned by retriever.retrieve()
-                     Each dict must have at least "entity_name" and "text" keys.
-    """
+def _build_prompt(
+    query: str,
+    context_chunks: list[dict],
+    history: list[dict] | None = None,
+) -> str:
     context_parts: list[str] = []
     for chunk in context_chunks:
         entity = chunk.get("entity_name", "Unknown")
@@ -41,9 +36,18 @@ def _build_prompt(query: str, context_chunks: list[dict]) -> str:
 
     context_str = "\n\n".join(context_parts)
 
+    history_str = ""
+    if history:
+        pairs = []
+        for msg in history:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            pairs.append(f"{role}: {msg['content']}")
+        history_str = "Conversation so far:\n" + "\n".join(pairs) + "\n\n"
+
     prompt = (
         f"{SYSTEM_PROMPT}\n\n"
         f"Context:\n{context_str}\n\n"
+        f"{history_str}"
         f"Question: {query}\n\n"
         f"Answer:"
     )
@@ -56,6 +60,7 @@ def generate_answer(
     query: str,
     context_chunks: list[dict],
     model: str = LLM_MODEL,
+    history: list[dict] | None = None,
 ) -> str:
     """
     Generate an answer for *query* using *context_chunks* as grounding context.
@@ -76,7 +81,7 @@ def generate_answer(
             "No relevant context was retrieved for your question."
         )
 
-    prompt = _build_prompt(query, context_chunks)
+    prompt = _build_prompt(query, context_chunks, history=history)
 
     payload = {
         "model": model,
